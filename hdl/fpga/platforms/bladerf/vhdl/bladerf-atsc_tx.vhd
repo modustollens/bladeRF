@@ -102,6 +102,8 @@ architecture atsc_tx of bladerf is
     signal sys_rst_sync     : std_logic ;
 
     signal usb_speed        : std_logic ;
+    signal usb_speed_rx     : std_logic ;
+    signal usb_speed_tx     : std_logic ;
 
     signal tx_reset         : std_logic ;
     signal rx_reset         : std_logic ;
@@ -179,18 +181,6 @@ architecture atsc_tx of bladerf is
     signal tx_request : std_logic;
 
 
-    constant RANDOM_MULT : unsigned(63 downto 0) := x"2545f4914f6cdd1d";
-    function random_xor (old : unsigned) return unsigned is
-        variable x : unsigned(old'range) := (others=>'0');
-        variable y : unsigned(old'range) := (others=>'0');
-        variable z : unsigned(old'range) := (others=>'0');
-    begin
-        x := old xor shift_right(old,12);
-        y := x xor shift_left(x,25);
-        z := y xor shift_right(y,27);
-        return resize( shift_right(z * RANDOM_MULT,z'length),z'length);
-    end function;
-
 begin
 
     correction_tx_phase <= signed(correction_tx_phase_gain(31 downto 16));
@@ -218,6 +208,27 @@ begin
         async               =>  nios_gpio(7),
         sync                =>  usb_speed
       ) ;
+
+    U_usb_speed_rx : entity work.synchronizer
+      generic map (
+        RESET_LEVEL         =>  '0'
+      ) port map (
+        reset               =>  '0',
+        clock               =>  rx_clock,
+        async               =>  nios_gpio(7),
+        sync                =>  usb_speed_rx
+      ) ;
+
+    U_usb_speed_tx : entity work.synchronizer
+      generic map (
+        RESET_LEVEL         =>  '0'
+      ) port map (
+        reset               =>  '0',
+        clock               =>  tx_clock,
+        async               =>  nios_gpio(7),
+        sync                =>  usb_speed_tx
+      ) ;
+
 
     U_rx_source : entity work.synchronizer
       generic map (
@@ -338,6 +349,7 @@ begin
 
         usb_speed           =>  usb_speed,
 
+        meta_enable         =>  '0',
         rx_enable           =>  pclk_rx_enable,
         tx_enable           =>  pclk_tx_enable,
 
@@ -348,17 +360,30 @@ begin
         ctl_out             =>  fx3_ctl_out,
         ctl_oe              =>  fx3_ctl_oe,
 
-        tx_fifo_write       =>  open,
+        tx_fifo_write       =>  tx_sample_fifo.wreq,
         tx_fifo_full        =>  tx_sample_fifo.wfull,
         tx_fifo_empty       =>  tx_sample_fifo.wempty,
         tx_fifo_usedw       =>  tx_sample_fifo.wused,
-        tx_fifo_data        =>  open,
+        tx_fifo_data        =>  tx_sample_fifo.wdata,
+
+        tx_timestamp        =>  (others => '0'),
+        tx_meta_fifo_write  =>  open,
+        tx_meta_fifo_full   =>  '0',
+        tx_meta_fifo_empty  =>  '0',
+        tx_meta_fifo_usedw  =>  "00",
+        tx_meta_fifo_data   =>  open,
 
         rx_fifo_read        =>  rx_sample_fifo.rreq,
         rx_fifo_full        =>  rx_sample_fifo.rfull,
         rx_fifo_empty       =>  rx_sample_fifo.rempty,
         rx_fifo_usedw       =>  rx_sample_fifo.rused,
-        rx_fifo_data        =>  rx_sample_fifo.rdata
+        rx_fifo_data        =>  rx_sample_fifo.rdata,
+
+        rx_meta_fifo_read   =>  open,
+        rx_meta_fifo_full   =>  '0',
+        rx_meta_fifo_empty  =>  '0',
+        rx_meta_fifo_usedr  =>  "00",
+        rx_meta_fifo_data   =>  (others => '0')
       ) ;
 
     -- Sample bridges
@@ -368,11 +393,20 @@ begin
         reset               =>  rx_reset,
         enable              =>  rx_enable,
 
+        usb_speed           =>  usb_speed_rx,
+        meta_en             =>  '0',
+        timestamp           =>  (others => '0'),
+
         fifo_clear          =>  rx_sample_fifo.aclr,
         fifo_full           =>  rx_sample_fifo.wfull,
         fifo_usedw          =>  rx_sample_fifo.wused,
         fifo_data           =>  rx_sample_fifo.wdata,
         fifo_write          =>  rx_sample_fifo.wreq,
+
+        meta_fifo_full      =>  '0',
+        meta_fifo_usedw     =>  (others => '0'),
+        meta_fifo_data      =>  open,
+        meta_fifo_write     =>  open,
 
         in_i                =>  rx_sample_corrected_i,
         in_q                =>  rx_sample_corrected_q,
@@ -411,10 +445,19 @@ begin
         reset               =>  tx_reset,
         enable              =>  tx_enable,
 
+        usb_speed           =>  usb_speed_tx,
+        meta_en             =>  '0',
+        timestamp           =>  (others => '0'),
+
         fifo_empty          =>  tx_sample_fifo.rempty,
         fifo_usedw          =>  tx_sample_fifo.rused,
         fifo_data           =>  tx_sample_fifo.rdata,
         fifo_read           =>  open,
+
+        meta_fifo_empty     =>  '0',
+        meta_fifo_usedw     =>  (others => '0'),
+        meta_fifo_data      =>  (others => '0'),
+        meta_fifo_read      =>  open,
 
         out_i               =>  open,
         out_q               =>  open,
@@ -425,6 +468,7 @@ begin
         underflow_duration  =>  x"ffff"
       ) ;
 
+    --delay the valid by one clock from the request
     tx_valid_register : process(tx_reset, tx_clock)
     begin
         if (tx_reset = '1') then
@@ -433,26 +477,6 @@ begin
             tx_valid <= tx_sample_fifo.rreq;
         end if;
     end process;
-
-    feed_fifo: process (tx_reset, tx_clock)
-        variable in_data: unsigned(31 downto 0);
-    begin
-
-        if (tx_reset = '1') then
-            --
-            in_data :=x"1337cafe";
-
-        elsif rising_edge(tx_clock) then
-
-            if tx_enable = '1'  and tx_sample_fifo.wfull = '0' then 
-                tx_sample_fifo.wdata <= std_logic_vector(in_data);
-                tx_sample_fifo.wreq <= '1';
-                in_data :=random_xor(in_data);
-            end if;
-
-        end if;
-    end process;
-
 
     U_atsc_transmitter : entity work.atsc_tx(arch)
         generic map(
@@ -471,7 +495,6 @@ begin
         sample_out_i        => tx_sample_raw_i,
         sample_out_q        => tx_sample_raw_q,
         sample_out_valid    => tx_sample_raw_valid
-
     );
 
     U_tx_iq_correction : entity work.iq_correction(tx)
@@ -522,19 +545,6 @@ begin
         tx_lms_data         =>  lms_tx_data,
         tx_lms_iq_sel       =>  lms_tx_iq_select,
         tx_lms_enable       =>  open
-      ) ;
-
-    U_rx_siggen : entity work.signal_generator
-      port map (
-        clock           =>  rx_clock,
-        reset           =>  rx_reset,
-        enable          =>  rx_enable,
-
-        mode            =>  '0',
-
-        sample_i        =>  rx_gen_i,
-        sample_q        =>  rx_gen_q,
-        sample_valid    =>  rx_gen_valid
       ) ;
 
     rx_mux : process(rx_reset, rx_clock)
