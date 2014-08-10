@@ -84,10 +84,7 @@ architecture arch of atsc_tx is
 -- 4.0960e+03 + 1.0032e-12i
 
     function create_tone( fs, ftone : real) return complex_fixed_t is
-
     begin
-
-
         return rv;
     end function;
 
