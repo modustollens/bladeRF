@@ -60,37 +60,6 @@ architecture arch of atsc_tx_tb is
                                                         (to_signed(-4096,16),   to_signed(0,16)),
                                                         (to_signed(0,16),       to_signed(4096,16) ));
 
-
-    --
-
--- 4.0960e+03 - 0.0000e+00i   
--- 3.5472e+03 - 2.0480e+03i   
--- 2.0480e+03 - 3.5472e+03i   
--- 2.5081e-13 - 4.0960e+03i  
--- -2.0480e+03 - 3.5472e+03i  
--- -3.5472e+03 - 2.0480e+03i  
--- -4.0960e+03 - 5.0162e-13i
--- 3.5472e+03 + 2.0480e+03i  
--- -2.0480e+03 + 3.5472e+03i  
--- -7.5242e-13 + 4.0960e+03i   
--- 2.0480e+03 + 3.5472e+03i  
--- 3.5472e+03 + 2.0480e+03i  
--- 4.0960e+03 + 1.0032e-12i
-
-    constant atsc_lo_table : complex_fixed_array_t := ( (to_signed(4096,16),    to_signed(0,16)),
-                                                        (to_signed(3547,16),       to_signed(-2048,16)),
-                                                        (to_signed(2048,16),       to_signed(-3547,16)),
-                                                        (to_signed(0,16),       to_signed(-4096,16)),
-                                                        (to_signed(-2048,16),       to_signed(-3547,16)),
-                                                        (to_signed(-3547,16),       to_signed(-2048,16)),
-                                                        (to_signed(-4096,16),       to_signed(0,16)),
-                                                        (to_signed(3547,16),       to_signed(2048,16)),
-                                                        (to_signed(-2048,16),       to_signed(3547,16)),
-                                                        (to_signed(0,16),       to_signed(4096,16)),
-                                                        (to_signed(2048,16),       to_signed(3547,16)),
-                                                        (to_signed(3547,16),       to_signed(4096,16) ));
-
-
     function cmult( a, b : complex_fixed_t; q : natural ) return complex_fixed_t is
         variable rv : complex_fixed_t := (to_signed(0,16),to_signed(0,16));
     begin

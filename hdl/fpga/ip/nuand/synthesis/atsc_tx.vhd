@@ -84,23 +84,25 @@ architecture arch of atsc_tx is
 -- 4.0960e+03 + 1.0032e-12i
 
     function create_tone( fs, ftone : real) return complex_fixed_t is
+        variable rv : complex_fixed_t := (to_signed(0,16),to_signed(0,16));
     begin
         return rv;
     end function;
 
 
-    constant atsc_lo_table : complex_fixed_array_t := ( (to_signed(4096,16),        to_signed(0,16)),
-                                                        (to_signed(3547,16),        to_signed(-2048,16)),
-                                                        (to_signed(2048,16),        to_signed(-3547,16)),
-                                                        (to_signed(0,16),           to_signed(-4096,16)),
-                                                        (to_signed(-2048,16),       to_signed(-3547,16)),
-                                                        (to_signed(-3547,16),       to_signed(-2048,16)),
-                                                        (to_signed(-4096,16),       to_signed(0,16)),
-                                                        (to_signed(-3547,16),       to_signed(2048,16)),
-                                                        (to_signed(-2048,16),       to_signed(3547,16)),
-                                                        (to_signed(0,16),           to_signed(4096,16)),
-                                                        (to_signed(2048,16),        to_signed(3547,16)),
-                                                        (to_signed(3547,16),        to_signed(2048,16) ));
+    constant atsc_lo_table : complex_fixed_array_t := ( (to_signed( integer(4096.0*1.5/7.0),16),        to_signed( integer(1.5/7.0 * 0.0),16)),
+                                                        (to_signed( integer(1.5/7.0 * 3547.0),16),      to_signed( integer(1.5/7.0 * (-2048.0)),16)),
+                                                        (to_signed( integer(1.5/7.0 * 2048.0),16),      to_signed( integer(1.5/7.0 * (-3547.0)),16)),
+                                                        (to_signed( integer(1.5/7.0 * 0.0),16),         to_signed( integer(1.5/7.0 * (-4096.0)),16)),
+                                                        (to_signed( integer(1.5/7.0 * (-2048.0)),16),   to_signed( integer(1.5/7.0 * (-3547.0)),16)),
+                                                        (to_signed( integer(1.5/7.0 * (-3547.0)),16),   to_signed( integer(1.5/7.0 * (-2048.0)),16)),
+                                                        (to_signed( integer(1.5/7.0 * (-4096.0)),16),   to_signed( integer(1.5/7.0 * 0.0),16)),
+                                                        (to_signed( integer(1.5/7.0 * (-3547.0)),16),   to_signed( integer(1.5/7.0 * 2048.0),16)),
+                                                        (to_signed( integer(1.5/7.0 * (-2048.0)),16),   to_signed( integer(1.5/7.0 * 3547.0),16)),
+                                                        (to_signed( integer(1.5/7.0 * 0.0),16),         to_signed( integer(1.5/7.0 * 4096.0),16)),
+                                                        (to_signed( integer(1.5/7.0 * 2048.0),16),      to_signed( integer(1.5/7.0 * 3547.0),16)),
+                                                        (to_signed( integer(1.5/7.0 * 3547.0),16),      to_signed( integer(1.5/7.0 * 2048.0),16) ));
+
 
 
     function cmult( a, b : complex_fixed_t; q : natural ) return complex_fixed_t is
@@ -321,7 +323,7 @@ begin
         );
 
     generate_nco_phase : process(clock,reset)
-        subtype  phases_t is natural range 0 to 3;
+        subtype  phases_t is natural range 0 to 2;
         variable dphase : phases_t;
     begin
         if (reset = '1') then
@@ -420,8 +422,8 @@ begin
             tx_symbol_valid <= '0';
 
             if filtered_sample_valid = '1' then
-                tx_symbol.re <= filtered_sample.re + shift_right(atsc_lo_table(pilot).re,1);
-                tx_symbol.im <= filtered_sample.im + shift_right(atsc_lo_table(pilot).im,1);
+                tx_symbol.re <= filtered_sample.re + shift_right(atsc_lo_table(pilot).re,2);
+                tx_symbol.im <= filtered_sample.im + shift_right(atsc_lo_table(pilot).im,2);
 
                 tx_pilot.re <=  shift_right(atsc_lo_table(pilot).re,1);
                 tx_pilot.im <=  shift_right(atsc_lo_table(pilot).im,1);
@@ -442,8 +444,8 @@ begin
             registered_symbol <= ((others=> '0'),(others=>'0'));
             registered_symbol_valid <= '0';
         elsif rising_edge(clock) then
-            registered_symbol.re <= shift_right(tx_symbol.re,1);
-            registered_symbol.im <= shift_right(tx_symbol.im,1);
+            registered_symbol.re <= shift_right(tx_symbol.re,2);
+            registered_symbol.im <= shift_right(tx_symbol.im,2);
             registered_symbol_valid <= tx_symbol_valid;
         end if;
     end process;

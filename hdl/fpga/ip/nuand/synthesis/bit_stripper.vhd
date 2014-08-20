@@ -33,7 +33,7 @@ architecture arch of bit_stripper is
     type stripper_fsm_t is (FLUSH,SHIFT_BUFFER,OUTPUT_DATA);
     signal stripper_fsm : stripper_fsm_t;
 
-    constant THRESHOLD : positive := OUTPUT_WIDTH*2;
+    constant THRESHOLD : positive := OUTPUT_WIDTH;
 
 
 begin
@@ -63,17 +63,22 @@ begin
                     bit_count := 0;
                     data_buffer <= (others => '0');
                     if enable = '1' then
-                        in_data_request <= '1';
                         stripper_fsm <= SHIFT_BUFFER;
                     end if;
 
                 when SHIFT_BUFFER =>
-                    if in_data_valid = '1' then
                         --
+                        case bit_count is
+                            when 0 => data_buffer <= "000" & in_data;                        
+                            when 1 => data_buffer <= "00" & in_data & data_buffer(0);                 
+                            when 2 => data_buffer <= '0' & in_data & data_buffer(1 downto 0);                 
+                            when 3 => data_buffer <= in_data & data_buffer(2 downto 0); 
+                            when others => data_buffer <=  "000" & in_data; 
+                        end case;
                         bit_count := bit_count + INPUT_WIDTH;
-                        data_buffer <= in_data & data_buffer(OUTPUT_WIDTH-1 downto 0); 
                         stripper_fsm <= OUTPUT_DATA;
-                    end if;
+                        in_data_request <= '1';
+        
 
                 when OUTPUT_DATA =>
 
@@ -85,12 +90,10 @@ begin
                         data_buffer <= (OUTPUT_WIDTH-1 downto 0 => '0') & data_buffer( (INPUT_WIDTH+OUTPUT_WIDTH)-1 downto OUTPUT_WIDTH);
                         bit_count := bit_count - OUTPUT_WIDTH;
 
-                    if bit_count <= THRESHOLD then
-                        
-                        in_data_request <= '1';
-                        stripper_fsm <= SHIFT_BUFFER;
-
                     end if;
+
+                    if bit_count <= THRESHOLD then
+                        stripper_fsm <= SHIFT_BUFFER;
                     end if;
 
                 
