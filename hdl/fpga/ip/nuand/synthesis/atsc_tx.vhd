@@ -13,6 +13,7 @@ entity atsc_tx is
     generic(
         INPUT_WIDTH : positive := 32;
         OUTPUT_WIDTH : positive:= 16;
+        SYMBOL_DOWNLOAD_WIDTH : positive := 4;
         SPS : natural := 3;
         CPS : natural := 2
     );
@@ -38,7 +39,7 @@ architecture arch of atsc_tx is
 
     --bit stripper signals
     signal strip_enable : std_logic;
-    signal symbol_bits : std_logic_vector(2 downto 0);
+    signal symbol_bits : std_logic_vector(SYMBOL_DOWNLOAD_WIDTH-1 downto 0);
     signal symbol_bits_request : std_logic;
     signal symbol_bits_valid : std_logic;
 
@@ -69,20 +70,7 @@ architecture arch of atsc_tx is
     --pilot
     signal tx_pilot : complex_fixed_t;
 
--- 4.0960e+03 - 0.0000e+00i   
--- 3.5472e+03 - 2.0480e+03i   
--- 2.0480e+03 - 3.5472e+03i   
--- 2.5081e-13 - 4.0960e+03i  
--- -2.0480e+03 - 3.5472e+03i  
--- -3.5472e+03 - 2.0480e+03i  
--- -4.0960e+03 - 5.0162e-13i
--- 3.5472e+03 + 2.0480e+03i  
--- -2.0480e+03 + 3.5472e+03i  
--- -7.5242e-13 + 4.0960e+03i   
--- 2.0480e+03 + 3.5472e+03i  
--- 3.5472e+03 + 2.0480e+03i  
--- 4.0960e+03 + 1.0032e-12i
-
+    -- todo:create tone dynamically
     function create_tone( fs, ftone : real) return complex_fixed_t is
         variable rv : complex_fixed_t := (to_signed(0,16),to_signed(0,16));
     begin
@@ -262,7 +250,7 @@ begin
     U_stripper : entity work.bit_stripper(arch)
        generic map(
            INPUT_WIDTH => 32,
-           OUTPUT_WIDTH => 3
+           OUTPUT_WIDTH => 4
            )
 
         port map(
@@ -306,7 +294,7 @@ begin
     end process;
 
     map_inputs.bits(map_inputs.bits'length -1 downto 3) <= (others => '0');
-    map_inputs.bits(2 downto 0) <=  symbol_bits;
+    map_inputs.bits(2 downto 0) <=  symbol_bits(2 downto 0);
     map_inputs.modulation <= VSB_8;
     map_inputs.valid <= symbol_bits_valid;
 
@@ -322,8 +310,9 @@ begin
             outputs => map_outputs
         );
 
+    --apply fs/4 multiply to center
     generate_nco_phase : process(clock,reset)
-        subtype  phases_t is natural range 0 to 2;
+        subtype  phases_t is natural range 0 to 3;
         variable dphase : phases_t;
     begin
         if (reset = '1') then

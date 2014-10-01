@@ -6,7 +6,7 @@ library ieee;
 entity bit_stripper is 
     generic(
         INPUT_WIDTH     : positive := 32;
-        OUTPUT_WIDTH    : positive := 1;
+        OUTPUT_WIDTH    : positive := 1;        
         CPS             : positive := 2
     );
 
@@ -48,6 +48,7 @@ begin
 
             out_data <= (others => '0');
             out_data_valid <= '0';
+            in_data_request <= '0';
 
         elsif rising_edge(clock) then
 
@@ -69,19 +70,18 @@ begin
                 when SHIFT_BUFFER =>
                         --
                         case bit_count is
-                            when 0 => data_buffer <= "000" & in_data;                        
-                            when 1 => data_buffer <= "00" & in_data & data_buffer(0);                 
-                            when 2 => data_buffer <= '0' & in_data & data_buffer(1 downto 0);                 
-                            when 3 => data_buffer <= in_data & data_buffer(2 downto 0); 
-                            when others => data_buffer <=  "000" & in_data; 
+                            when 0 => data_buffer <= "0000" & in_data;                        
+                            when 1 => data_buffer <= "000" & in_data & data_buffer(0);                 
+                            when 2 => data_buffer <= "00" & in_data & data_buffer(1 downto 0);                 
+                            when 3 => data_buffer <= '0' & in_data & data_buffer(2 downto 0); 
+                            when 4 => data_buffer <= in_data & data_buffer(3 downto 0);
+                            when others => data_buffer <=  "0000" & in_data; 
                         end case;
                         bit_count := bit_count + INPUT_WIDTH;
                         stripper_fsm <= OUTPUT_DATA;
                         in_data_request <= '1';
         
-
                 when OUTPUT_DATA =>
-
 
                     if out_data_request = '1' then
                         out_data <= data_buffer(OUTPUT_WIDTH -1 downto 0);

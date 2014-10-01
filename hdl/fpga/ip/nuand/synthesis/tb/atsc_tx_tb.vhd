@@ -102,6 +102,9 @@ architecture arch of atsc_tx_tb is
         z := y xor shift_right(y,27);
         return resize( shift_right(z * RANDOM_MULT,z'length),z'length);
     end function;
+
+    signal data_request_reader : std_logic;
+    signal delay_request_reader : std_logic;
 begin
 
     clock <= not clock after 1 ns;
@@ -116,7 +119,7 @@ begin
 
     begin 
         reset <= '1';
-
+        delay_request_reader <='0';
         --setup nco input
         delta := to_signed(1,delta'length);
         nco_inputs.valid <= '0';
@@ -129,6 +132,8 @@ begin
         --release reset;
         reset <= '0';
         nop(clock, 10);
+
+        delay_request_reader <='1';
 
         --clock in data
         for i in 0 to 100000 loop 
@@ -148,44 +153,57 @@ begin
 
             nop(clock,10);
         end loop;
-
-
-
         --save result
 
 
     end process;
 
+    data_request_reader <= '1' when ((unsigned(tx_sample_fifo.wused) < to_unsigned(2048,tx_sample_fifo.wused'length)) and delay_request_reader ='1' )else '0';
+
+    U_file_reader : entity work.data_reader
+        generic map (
+            FILENAME => "input.dat",
+            DATA_WIDTH => 32
+        )
+        port map (
+            reset => reset,
+            clock => clock,
+
+            data_request => data_request_reader,
+            data => tx_sample_fifo.wdata,
+            data_valid => tx_sample_fifo.wreq
+        );
+
+
     feed_fifo: process
         variable in_data: unsigned(31 downto 0) := x"1337cafe";
     begin
         tx_enable <= '0';
-        tx_sample_fifo.wdata <= (others => '0');
-        tx_sample_fifo.wreq <= '0';
+        --tx_sample_fifo.wdata <= (others => '0');
+        --tx_sample_fifo.wreq <= '0';
         nop(clock,10);
 
-        nop(clock,10);
 
 
         for i in 0 to 10 loop
-            tx_sample_fifo.wdata <= std_logic_vector(in_data);
-            tx_sample_fifo.wreq <= '1';
+            --tx_sample_fifo.wdata <= std_logic_vector(in_data);
+            --tx_sample_fifo.wreq <= '1';
             in_data :=random_xor(in_data);
 
             wait until rising_edge(clock);
-            tx_sample_fifo.wreq <= '0';
+            --tx_sample_fifo.wreq <= '0';
             nop(clock,10);
         end loop;
 
         tx_enable <= '1';
 
-        for i in 0 to 1000 loop
-            tx_sample_fifo.wdata <= std_logic_vector(in_data);
-            tx_sample_fifo.wreq <= '1';
+        for i in 0 to 100000 loop
+            --tx_sample_fifo.wdata <= std_logic_vector(in_data);
+            --tx_sample_fifo.wreq <= '1';
             in_data :=random_xor(in_data);
 
             wait until rising_edge(clock);
-            tx_sample_fifo.wreq <= '0';
+            --tx_sample_fifo.wreq <= '0';
             nop(clock,20);
         end loop;
     end process;
@@ -264,8 +282,6 @@ begin
             data_valid => tx_symbol_valid
         );
 
-
-
    --U_nco_test : entity work.nco(arch)
    --    port map (
    --        clock => clock,
@@ -274,8 +290,6 @@ begin
    --        inputs => nco_inputs,
    --        outputs => nco_outputs
    --    );
-
-
 
 
 end architecture;
