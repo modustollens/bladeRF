@@ -430,7 +430,8 @@ static int tx_cmd_start(struct cli_state *s)
     if (status == 0) {
         pthread_mutex_lock(&s->tx->file_mgmt.file_lock);
 
-        assert(s->tx->file_mgmt.format == RXTX_FMT_BIN_SC16Q11);
+        assert( (s->tx->file_mgmt.format == RXTX_FMT_BIN_SC16Q11) ||
+                (s->tx->file_mgmt.format == RXTX_FMT_BIN_RAW));
         status = expand_and_open(s->tx->file_mgmt.path, "rb",
                                  &s->tx->file_mgmt.file);
         pthread_mutex_unlock(&s->tx->file_mgmt.file_lock);

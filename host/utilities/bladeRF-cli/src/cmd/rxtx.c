@@ -192,6 +192,8 @@ void rxtx_print_file_format(struct rxtx_data *rxtx,
         case RXTX_FMT_BIN_SC16Q11:
             printf("%sSC16 Q11, Binary%s", prefix, suffix);
             break;
+        case RXTX_FMT_BIN_RAW:
+            printf("%sRaw Binary%s", prefix, suffix);
         default:
             printf("%sNot configured%s", prefix, suffix);
     }
@@ -253,6 +255,8 @@ enum rxtx_fmt rxtx_str2fmt(const char *str)
         ret = RXTX_FMT_CSV_SC16Q11;
     } else if (!strcasecmp("bin", str)) {
         ret = RXTX_FMT_BIN_SC16Q11;
+    } else if (!strcasecmp("raw", str)) {
+        ret = RXTX_FMT_BIN_RAW;
     }
 
     return ret;
